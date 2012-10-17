@@ -8,7 +8,7 @@ tags and tagged_images.
 Note, I had initially thought that in addition to updating the Darktable
 database I would need to make the equivalent changes in the .xmp sidecar
 file.  This does not appear to be the case -- in all my testing it appears
-as though the Darktable will update the sidecar file on startup if it 
+as though Darktable will update the sidecar file on startup if it 
 detects any changes in the database. So it appears I do not need to worry
 about the sidecar - I can just make the changes I want to the database 
 and then let Darktable update the sidecar on next start.
