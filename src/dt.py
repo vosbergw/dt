@@ -406,13 +406,17 @@ def im_setHistory(conn,imId,val):
     
     n = c.execute('select num from history where imgid = ?',(imId,)).fetchall()
     entry = len(n)
-    
     # just retain any previous blendop_params and blendop_version
-    (blendop,blendop_ver) = c.execute('select blendop_params, blendop_version from history where imgid = ?',(imId,)).fetchone()
+    blendop = None
+    try:
+        (blendop,blendop_ver) = c.execute('select blendop_params, blendop_version from history where imgid = ?',(imId,)).fetchone()
+    except:
+        pass
+    
     if blendop == None:
         blendop = sqlite3.Binary(newBopXmp)
         blendop_ver = 1
-        
+                
     #c.execute('insert into history values(?,?,?,?,?,?,?,?)',(imId,entry,3,'clipping',sqlite3.Binary(newOpXmp),1,sqlite3.Binary(newBopXmp)),blendop_ver)
     c.execute('insert into history values(?,?,?,?,?,?,?,?)',(imId,entry,3,'clipping',sqlite3.Binary(newOpXmp),1,blendop,blendop_ver))
     conn.commit()
@@ -552,23 +556,26 @@ def dt():
             '''
             Darktable filmroll/image/metadata maintenance:
             
-            mv <src> <dest>                                  rename film roll or image
-            query <dir|file> [ <dir|file> ... ]              dump details of a film roll or image (note: best on 132+ column term)
-            scan <dir|file> [ <dir}|file> ... ]              just report if the object does not exist in the db - 
-                                                             .xmp and .meta extensions will be stripped before the check
-            set <image> <var> <val> [ <var> <val> ... ]      set a variable for a specific file
+            mv <src> <dest>                             : rename film roll or image
+            query <dir|file> [ <dir|file> ... ]         : dump details of an object
+                                                          (best on 132+ column term)
+            scan <dir|file> [ <dir}|file> ... ]         : just report if the object 
+                                                          doesn't exist in the db - 
+                                                          .xmp and .meta extensions 
+                                                          will be stripped before the 
+                                                          check
+            set <image> <var> <val> [ <var> <val> ... ] : modify metadata
             
             For the 'set' command, the valid var's are:
+            
             image table:
                 datetime_taken         "YYYY:MM:DD HH:MM:SS"
                 caption                "text"
                 description            "text"
                 license                "text"
-                longitude              float (-180.0 to +180.0, positive E)
-                latitude               float (-90.0 to +90.0, positive N)
-                                       Note: To convert degrees minutes seconds to a float: 
-                                                   f = degrees + ( minutes + seconds/60. ) / 60.
-                                             and change sign if W or S.
+                longitude              float (-180.0 to +180.0, positive E) (Note 3)
+                latitude               float (-90.0 to +90.0, positive N) (Note 3)
+                                       
             meta_data table:
                 creator                "text"
                 publisher              "text"
@@ -576,18 +583,23 @@ def dt():
                 description            "text"
                 rights                 "text"
             history table:
-                crop                   "angle,cx,cy,cw,ch"
-                                       Note: angle is the rotation angle before crop, positive clockwise,
-                                             cx, cy, cw, ch are the normalized crop coordinates (0.0 to 1.0),
-                                             cx,cy is lower left(?) and cw,ch are new width and height.
+                crop                   "angle,cx,cy,cw,ch" (Note 4)
+                                       
             tags and tagged_images tables:
-                tag                    "text"
-                                       Note: you may add tags but not modify or remove existing tags.
+                tag                    "text" (Note 5)
+                                       
             NOTES:
-              1) before modifying the database dt will check to make sure darktable is not running
-              2) if a modification is going to be made to the database a backup will be made first: <library.db>.<timestamp>
-                 unless you specify --no-backup
-            
+              1) before modifying the database dt will check to make sure darktable 
+                 is not running
+              2) if a modification is going to be made to the database a backup will 
+                 be made first: <library.db>.<timestamp>, unless you specify --no-backup
+              3) to convert degrees minutes seconds to a float: 
+                    f = degrees + ( minutes + seconds/60. ) / 60.
+                 and change sign if W or S.
+              4) angle is the rotation angle before crop, positive clockwise,
+                 cx, cy, cw, ch are the normalized crop coordinates (0.0 to 1.0),
+                 cx,cy is lower left(?) and cw,ch are new width and height.
+              5) you may add tags but not modify or remove existing tags
             
             '''))
     
@@ -601,7 +613,7 @@ def dt():
     parser.add_argument('cmd', metavar='<command>', type=str,
         help='mv, query, set, etc')
 
-    parser.add_argument('files', metavar='<parameter>', type=str, nargs='+')
+    parser.add_argument('files', metavar='<parm>', type=str, nargs='+')
     
     args = parser.parse_args()
     
@@ -683,7 +695,7 @@ def dt():
             metaKeys = [ 'creator', 'publisher', 'title', 'description', 'rights' ]
             imageKeys = [ 'datetime_taken', 'caption', 'description', 'license', 'longitude', 'latitude' ]
             historyKeys = [ 'crop' ]
-           
+            print 'imVars: ',imVars
             for k,v in imVars.iteritems():
                 if k in metaKeys:
                     im_setMeta(conn,imId,k,v)
