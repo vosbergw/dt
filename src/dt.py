@@ -648,13 +648,8 @@ def dt():
             if len(args.files) != 2:
                 raise Exception('mv <from> <to>')
             else:
-                mvSrc = os.path.abspath(args.files[0])
-                if os.path.isabs(args.files[1]):
-                    mvDest = args.files[1]
-                else:
-                    mvDest = os.path.dirname(mvSrc)+os.path.sep+args.files[1]
-                    
-                
+                mvSrc  = os.path.abspath(args.files[0])
+                mvDest = os.path.abspath(args.files[1])             
                 
             is_running('darktable',os.getenv('USER'))
             do_backup(args.dtdb,args.doBackup)
