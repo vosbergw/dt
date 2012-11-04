@@ -107,7 +107,7 @@ def dt_mv(conn,src,dest):
         # renaming film roll
         srcId = fr_getId(conn,src)
         os.renames(src,dest)
-        print 'dest: %s, id: %d'%(dest,srcId)
+        #print 'dest: %s, id: %d'%(dest,srcId)
         c.execute('update film_rolls set folder = ? where id = ?',(dest,srcId,))
         conn.commit()     
                
@@ -386,7 +386,7 @@ def im_getHistory(conn,imId):
         print fmt%(imName+'['+str(HI['num'])+']',HI[0],HI[1],HI[2],HI[3],'<blob>',HI[5],'<blob>',HI[7])
 
         # if this is a crop & rotate module, dump the details
-        if HI['module'] == 3:
+        if HI['operation'] == 'clipping':
             unPack(HI['op_params'])
         
         
@@ -564,7 +564,7 @@ def dt():
                                                           .xmp and .meta extensions 
                                                           will be stripped before the 
                                                           check
-            set <image> <var> <val> [ <var> <val> ... ] : modify metadata
+            set <image> <var> <val> [ <var> <val> ... ] : modify metadata (Note 6)
             
             For the 'set' command, the valid var's are:
             
@@ -600,6 +600,10 @@ def dt():
                  cx, cy, cw, ch are the normalized crop coordinates (0.0 to 1.0),
                  cx,cy is lower left(?) and cw,ch are new width and height.
               5) you may add tags but not modify or remove existing tags
+              6) if any of the variables you want to use in the set command begin with
+                 a "-", add a "--" option before the file name so that the python 
+                 argparser doesn't try to interpret them 
+                 (i.e. set -- file.jpg crop -1,0,0,1,1)
             
             '''))
     
@@ -613,6 +617,8 @@ def dt():
     parser.add_argument('cmd', metavar='<command>', type=str,
         help='mv, query, set, etc')
 
+    parser.parse_args(['--', '-f'])
+    
     parser.add_argument('files', metavar='<parm>', type=str, nargs='+')
     
     args = parser.parse_args()
@@ -695,7 +701,7 @@ def dt():
             metaKeys = [ 'creator', 'publisher', 'title', 'description', 'rights' ]
             imageKeys = [ 'datetime_taken', 'caption', 'description', 'license', 'longitude', 'latitude' ]
             historyKeys = [ 'crop' ]
-            print 'imVars: ',imVars
+            #print 'imVars: ',imVars
             for k,v in imVars.iteritems():
                 if k in metaKeys:
                     im_setMeta(conn,imId,k,v)
@@ -707,7 +713,7 @@ def dt():
                     im_setTag(conn,imId,v)
             
         except:
-            print 'error: %s'%sys.exc_info()[1]
+            print 'error: ',sys.exc_info()
             sys.exit()           
     else:
         print 'command??'          
