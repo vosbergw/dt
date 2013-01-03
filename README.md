@@ -141,8 +141,6 @@ query [/home/wayne/Darktable/raw/test1/image-0004.cr2]
 Now when you next run Darktable you should see all these values displayed.
 
 
-```
-
 ## Issues
 
 dt was last tested with git version 1.0+1830~g39f5af7.  That Darktable version used the
