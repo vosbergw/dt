@@ -1,8 +1,9 @@
 [Darktable](http://www.darktable.org) sqlite3 database management from
 the command line!
 
-Tested only with version 1.0+1830~g39f5af7 ([git](http://github.com/darktable-org/darktable)).  Should work on other versions as long as there are no
-changes to the following tables:  film_rolls, history, images, meta_data,
+Tested with version 1.0+1830~g39f5af7 and 1.1+193-g0c8e757 
+([git](http://github.com/darktable-org/darktable)).  Should work on newer versions as long as 
+there are no changes to the following tables:  film_rolls, history, images, meta_data,
 tags and tagged_images.
 
 Note, I had initially thought that in addition to updating the Darktable
@@ -143,7 +144,7 @@ Now when you next run Darktable you should see all these values displayed.
 
 ## Issues
 
-dt was last tested with git version 1.0+1830~g39f5af7.  That Darktable version used the
+dt was last tested with git version 1.1+193-g0c8e757.  That Darktable version used the
 following schema, and as long as the schema does not change dt should continue to work.
 I should still add a check to dt to verify the schema - and should probably open an issue
 with darktable to get a schema version number added to the database.
