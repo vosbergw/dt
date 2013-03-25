@@ -20,6 +20,52 @@ Copyright 2012 Wayne Vosberg <wayne.vosberg@mindtunnel.com>
 
 '''
 
+'''
+
+db schema version 36:
+
+CREATE TABLE color_labels (imgid integer, color integer);
+CREATE TABLE film_rolls (id integer primary key, datetime_accessed char(20), folder varchar(1024));
+CREATE TABLE history (imgid integer, num integer, module integer, operation varchar(256), 
+        op_params blob, enabled integer,blendop_params blob, blendop_version integer, 
+        multi_priority integer, multi_name varchar(256));
+CREATE TABLE images (id integer primary key, film_id integer, width int, height int, filename varchar,
+        maker varchar, model varchar, lens varchar, exposure real, aperture real, iso real, 
+        focal_length real, focus_distance real, datetime_taken char(20), flags integer, 
+        output_width integer, output_height integer, crop real, raw_parameters integer, 
+        raw_denoise_threshold real, raw_auto_bright_threshold real, raw_black real, raw_maximum real, 
+        caption varchar, description varchar, license varchar, sha1sum char(40), orientation integer,
+        group_id integer, histogram blob, lightmap blob, longitude double, latitude double, 
+        color_matrix blob, colorspace integer);
+CREATE TABLE legacy_presets (name varchar, description varchar, operation varchar, 
+        op_version integer, op_params blob, enabled integer, blendop_params blob, 
+        blendop_version integer, multi_priority integer, multi_name varchar, model varchar, 
+        maker varchar, lens varchar, iso_min real, iso_max real, exposure_min real, 
+        exposure_max real, aperture_min real, aperture_max real, focal_length_min real, 
+        focal_length_max real, writeprotect integer, autoapply integer, filter integer, 
+        def integer, isldr integer);
+CREATE TABLE lock (id integer);
+CREATE TABLE meta_data (id integer,key integer,value varchar);
+CREATE TABLE presets (name varchar, description varchar, operation varchar, op_version integer, 
+        op_params blob, enabled integer, blendop_params blob, model varchar, maker varchar, 
+        lens varchar, iso_min real, iso_max real, exposure_min real, exposure_max real, 
+        aperture_min real, aperture_max real, focal_length_min real, focal_length_max real, 
+        writeprotect integer, autoapply integer, filter integer, def integer, isldr integer, 
+        blendop_version integer, multi_priority integer, multi_name varchar(256));
+CREATE TABLE selected_images (imgid integer primary key);
+CREATE TABLE settings (settings blob);
+CREATE TABLE style_items (styleid integer,num integer,module integer,operation varchar(256),
+        op_params blob,enabled integer,blendop_params blob, blendop_version integer, 
+        multi_priority integer, multi_name varchar(256));
+CREATE TABLE styles (name varchar,description varchar);
+CREATE TABLE tagged_images (imgid integer, tagid integer, primary key(imgid, tagid));
+CREATE TABLE tags (id integer primary key, name varchar, icon blob, description varchar, flags integer);
+CREATE TABLE tagxtag (id1 integer, id2 integer, count integer, primary key(id1, id2));
+CREATE INDEX group_id_index on images (group_id);
+CREATE INDEX imgid_index on history (imgid);
+
+'''
+
 import os
 import sqlite3
 import sys
@@ -31,7 +77,7 @@ import shutil
 import subprocess
 import re
 
-
+dbVer = 0;
 
 def is_running(process, owner):
     '''raise exception if user is running process'''
@@ -52,6 +98,24 @@ def do_backup(dbFile,doIt):
             shutil.copyfile(dbFile,dbFile+'.'+tStamp)
         except:
             raise Exception('failed to create backup file [%s]'%doIt+'.'+tStamp)
+
+
+
+def getVersion(buf):
+    ''' return the first 8 bytes as the schema version number '''
+    
+    if type(buf) == str:
+        val = buf
+    else:
+        val = ''
+        for B in buf[0:8]:
+            val += '%02x'%ord(B)
+    
+    s_ver = val[0:8]
+    
+    ver = struct.unpack('<I',s_ver.decode('hex'))[0]
+    
+    return ver
 
 
 
@@ -84,11 +148,11 @@ def unPack(buf):
     k_h = struct.unpack('<f',s_k_h.decode('hex'))[0]
     k_v = struct.unpack('<f',s_k_v.decode('hex'))[0]
 
-    fmt = '\t\t\t%10s%10s%10s%10s%10s%10s%10s'
+    fmt = '                %10s%10s%10s%10s%10s%10s%10s'
     print ''
     print fmt%('angle','cx','cy','cw','ch','k_h','k_v')
     print fmt%(s_ang,s_cx,s_cy,s_cw,s_ch,s_k_h,s_k_v)
-    print '\t\t\t %9.4f %9.4f %9.4f %9.4f %9.4f %9.4f %9.4f'%(ang,cx,cy,cw,ch,k_h,k_v)
+    print '                %9.4f %9.4f %9.4f %9.4f %9.4f %9.4f %9.4f'%(ang,cx,cy,cw,ch,k_h,k_v)
     print ''
     
     
@@ -199,48 +263,48 @@ def query(conn,qFile):
     print '\nquery [%s]'%qFile
     qType = tUnknown
     if os.path.isdir(qFile):
-        print '\t%s is a valid directory'%qFile
+        print '  %s is a valid directory'%qFile
         qType = tRoll
         imRoll = qFile
         imFile = None
     elif os.path.isfile(qFile):
-        print '\t%s is a valid file'%qFile
+        print '  %s is a valid file'%qFile
         qType = tImage
         imRoll = os.path.dirname(qFile)
         imFile = os.path.basename(qFile)
     else:
-        print '\t%s is not a dir or file'%qFile
-        print '\t\tcheck if it is listed as a film roll:'
+        print '  %s is not a dir or file'%qFile
+        print '    check if it is listed as a film roll:'
         try:
             frId = fr_getId(conn,qFile)
-            print '\t\t%s was a film roll but the source directory is now missing!'%qFile
+            print '    %s was a film roll but the source directory is now missing!'%qFile
         except:
-            print '\t\tno!  check if parent was a film roll:'
+            print '    no!  check if parent was a film roll:'
             try:
                 frId = fr_getId(conn,os.path.dirname(qFile))
-                print '\t\tfilm roll %s exists but file %s does not!'%(os.path.dirname(qFile),os.path.basename(qFile))
+                print '    film roll %s exists but file %s does not!'%(os.path.dirname(qFile),os.path.basename(qFile))
             except:
-                print '\t\tno! [%s] was not found!'%qFile
+                print '    no! [%s] was not found!'%qFile
         
     if qType == tRoll:
         try:
             frId = fr_getId(conn,imRoll)
-            print '\tfilm roll [%s] is id [%d]'%(imRoll,frId)
+            print '  film roll [%s] is id [%d]'%(imRoll,frId)
         except:
-            print '\terror: %s'%sys.exc_info()[1]
+            print '  error: %s'%sys.exc_info()[1]
             
     if qType == tImage:
         try:
-            print '\tchecking for film roll [%s]'%imRoll
+            print '  checking for film roll [%s]'%imRoll
             frId = fr_getId(conn,imRoll)
             imId = im_getId(conn,frId,imFile)
-            print '\timage [%s] is id [%d] in film roll [%d]'%(imFile,imId,frId)
+            print '  image [%s] is id [%d] in film roll [%d]'%(imFile,imId,frId)
             im_getAll(conn,frId,imFile)
             im_getHistory(conn,imId)
             im_getTags(conn,imId)
             im_getMeta(conn,imId)
         except:
-            print '\terror: %s'%sys.exc_info()[1]
+            print '  error: %s'%sys.exc_info()[1]
                     
 
 
@@ -278,9 +342,9 @@ def im_getMeta(conn,imId):
     c = conn.cursor()
     imName = im_getName(conn,imId)
     keys = [ 'creator', 'publisher', 'title', 'description', 'rights' ]
-    fmt = '\t\t%-30s%60s'
+    fmt = '    %-35s%60s'
     
-    print '\n\tmeta_data:'
+    print '\n  meta_data:'
     for meta in c.execute('select * from meta_data where id = ?',(imId,)):
         if header:
             print fmt%('','value')
@@ -344,9 +408,9 @@ def im_getTags(conn,imId):
     header = True
     c=conn.cursor()
     imName = im_getName(conn,imId)
-    fmt = '\t\t%-30s%30s%30s'
+    fmt = '    %-30s%30s%30s'
     
-    print '\n\ttags:'
+    print '\n  tags:'
     
     for tagId in c.execute('select tagid from tagged_images where imgid = ?',(imId,)):
         if header:
@@ -365,26 +429,56 @@ def im_getTags(conn,imId):
 def im_getHistory(conn,imId):
     '''    get image history:
     
-        history (imgid integer, num integer, module integer, operation varchar(256), op_params blob, enabled integer,blendop_params blob, blendop_version integer);
+        v.34: history (imgid integer, num integer, module integer, operation varchar(256), 
+            op_params blob, enabled integer,blendop_params blob, blendop_version integer);
+            
+        v.36: history (imgid integer, num integer, module integer, operation varchar(256), 
+            op_params blob, enabled integer,blendop_params blob, blendop_version integer, 
+            multi_priority integer, multi_name varchar(256));
+        
         crop and rotate entries (module = 3, operation = clipping) will be expanded
         
     '''
-        
+    global dbVer    
     header = True
     c=conn.cursor()
     imName = im_getName(conn,imId)
-    fmt='\t\t%-30s%10s%10s%10s%12s%14s%10s%16s%16s'
+    #fmt34='    %-30s%10s%10s%10s%12s%14s%10s%16s%16s'
+    #fmt36='    %-30s%10s%10s%10s%12s%14s%10s%16s%16s%16s%32s'
     
-    print '\n\thistory:'  
+    print '\n  history:'  
     for HI in c.execute('select * from history where imgId = ?',(imId,)):
         if header:
             #print '\t\t   ',
-            print fmt%('',HI.keys()[0],HI.keys()[1],HI.keys()[2],HI.keys()[3],\
-                HI.keys()[4],HI.keys()[5],HI.keys()[6],HI.keys()[7])
+            print '    %-25s'%' ',
+            for h in HI.keys():
+                print '%*s'%(len(h)+4,h),
+            print '\n'
+            
+            '''
+            if dbVer == 34:
+                print fmt34%('',HI.keys()[0],HI.keys()[1],HI.keys()[2],HI.keys()[3],\
+                           HI.keys()[4],HI.keys()[5],HI.keys()[6],HI.keys()[7])
+            elif dbVer == 36:
+                print fmt36%('',HI.keys()[0],HI.keys()[1],HI.keys()[2],HI.keys()[3],\
+                           HI.keys()[4],HI.keys()[5],HI.keys()[6],HI.keys()[7],HI.keys()[8], \
+                           HI.keys()[9])
+            '''
             header = False
-
-        print fmt%(imName+'['+str(HI['num'])+']',HI[0],HI[1],HI[2],HI[3],'<blob>',HI[5],'<blob>',HI[7])
-
+        
+        print '    %-25s'%(imName+'['+str(HI['num'])+']'),
+        i=0
+        for v in HI:
+            if type(v) == buffer:
+                print '%*s'%(len(HI.keys()[i])+4,'<blob>'),
+            else:
+                print '%*s'%(len(HI.keys()[i])+4,v),
+            i+=1
+        print '\n'
+           
+        #print fmt34%(imName+'['+str(HI['num'])+']',HI[0],HI[1],HI[2],HI[3],'<blob>',HI[5],'<blob>', \
+        #    HI[7])
+        
         # if this is a crop & rotate module, dump the details
         if HI['operation'] == 'clipping':
             unPack(HI['op_params'])
@@ -394,9 +488,15 @@ def im_getHistory(conn,imId):
 def im_setHistory(conn,imId,val):
     '''    set image history: (currently only adds a crop & rotate entry)
     
-        history (imgid integer, num integer, module integer, operation varchar(256), op_params blob, enabled integer,blendop_params blob, blendop_version integer);
-        
+        v.34: history (imgid integer, num integer, module integer, operation varchar(256), 
+            op_params blob, enabled integer,blendop_params blob, blendop_version integer);
+            
+        v.36: history (imgid integer, num integer, module integer, operation varchar(256), 
+            op_params blob, enabled integer,blendop_params blob, blendop_version integer, 
+            multi_priority integer, multi_name varchar(256));
+                
     '''
+    global dbVer
     
     c = conn.cursor()
     
@@ -409,16 +509,28 @@ def im_setHistory(conn,imId,val):
     # just retain any previous blendop_params and blendop_version
     blendop = None
     try:
-        (blendop,blendop_ver) = c.execute('select blendop_params, blendop_version from history where imgid = ?',(imId,)).fetchone()
+        (blendop,blendop_ver) = c.execute(
+            'select blendop_params, blendop_version from history where imgid = ?',(imId,)).fetchone()
     except:
         pass
     
     if blendop == None:
         blendop = sqlite3.Binary(newBopXmp)
         blendop_ver = 1
-                
+    if dbVer == 34:
+        c.execute('insert into history values(?,?,?,?,?,?,?,?)',(imId,entry,3,'clipping',sqlite3.Binary(newOpXmp),1,blendop,blendop_ver))
+    elif dbVer == 36:
+        multi_priority = 0
+        multi_name = ''
+        try:
+            (multi_priority,multi_name) = c.execute('select multi_priority, multi_name from history where imgid = ?',(imId,)).fetchone()           
+        except:
+            pass
+        c.execute('insert into history values(?,?,?,?,?,?,?,?,?,?)',(imId,entry,3,'clipping',sqlite3.Binary(newOpXmp),1,blendop,blendop_ver,multi_priority,multi_name))
+    
+    
     #c.execute('insert into history values(?,?,?,?,?,?,?,?)',(imId,entry,3,'clipping',sqlite3.Binary(newOpXmp),1,sqlite3.Binary(newBopXmp)),blendop_ver)
-    c.execute('insert into history values(?,?,?,?,?,?,?,?)',(imId,entry,3,'clipping',sqlite3.Binary(newOpXmp),1,blendop,blendop_ver))
+    
     conn.commit()
 
     
@@ -502,11 +614,11 @@ def im_getAll(conn,frId,name):
     '''print the values I hope to be able to change'''
     
     c=conn.cursor()
-    fmt = '\t\t%-30s%30s'
+    fmt = '    %-35s%-30s'
     keys = [ 'datetime_taken', 'caption', 'description', 'license', 'longitude', 'latitude' ]
     
     imRow = c.execute('select datetime_taken, caption, description, license, longitude, latitude from images where film_id = ? and filename = ?',(frId,name,)).fetchone()  
-    print '\timage %s in film roll %s:'%(name,fr_getName(conn,frId))
+    print '  image %s in film roll %s:'%(name,fr_getName(conn,frId))
     for k in keys:
         print fmt%(name+'['+k+']',imRow[k])    
  
@@ -607,6 +719,8 @@ def dt():
             
             '''))
     
+    global dbVer
+    
     parser.add_argument('-d', '--db', dest='dtdb', action='store',
         default=os.getenv("HOME")+os.sep+'.config'+os.sep+'darktable'+os.sep+'library.db',
         help='Darktable database path, default= ~/.config/darktable/library.db')
@@ -635,12 +749,35 @@ def dt():
         conn.row_factory = sqlite3.Row
         conn.text_factory = str
         c = conn.cursor()
+        '''
+            Here is the darktable settings blob:
+            
+            typedef struct dt_ctl_settings_t
+                {
+                  // TODO: remove most of these options, maybe the whole struct?
+                  // global
+                  int32_t version;
+                  char dbname[512];
+                
+                  int32_t lib_image_mouse_over_id;
+                
+                  // synchronized navigation
+                  float dev_zoom_x, dev_zoom_y, dev_zoom_scale;
+                  dt_dev_zoom_t dev_zoom;
+                  int dev_closeup;
+                }
+                dt_ctl_settings_t;
+        '''
         try:
-            fr = c.execute('select * from film_rolls where id = 1').fetchone()[1]
+            vblob = c.execute('select settings from settings').fetchone()[0]
+            dbVer = getVersion(vblob)
+            if dbVer != 34 and dbVer != 36:
+                raise Exception('%s '%args.dtdb + 'version %d is not 34 or 36!'%dbVer)
+            
         except:
-            raise Exception('Either %s '%args.dtdb + 'is not a Darktable '+
-                'database or no film rolls have been imported yet')
-        
+            #print 'error: ',sys.exc_info()
+            raise Exception('%s '%args.dtdb + 'does not appear to be a Darktable database')
+
     except:
         print 'darktable db error: %s '%sys.exc_info()[1]
         sys.exit()

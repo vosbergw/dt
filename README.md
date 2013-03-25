@@ -1,10 +1,7 @@
 [Darktable](http://www.darktable.org) sqlite3 database management from
 the command line!
 
-Tested with version 1.0+1830~g39f5af7 and 1.1+193-g0c8e757 
-([git](http://github.com/darktable-org/darktable)).  Should work on newer versions as long as 
-there are no changes to the following tables:  film_rolls, history, images, meta_data,
-tags and tagged_images.
+dt now checks the DT_VERSION and should support versions 34 and 36.
 
 Note, I had initially thought that in addition to updating the Darktable
 database I would need to make the equivalent changes in the .xmp sidecar
@@ -141,44 +138,4 @@ query [/home/wayne/Darktable/raw/test1/image-0004.cr2]
 
 Now when you next run Darktable you should see all these values displayed.
 
-
-## Issues
-
-dt was last tested with git version 1.1+193-g0c8e757.  That Darktable version used the
-following schema, and as long as the schema does not change dt should continue to work.
-I should still add a check to dt to verify the schema - and should probably open an issue
-with darktable to get a schema version number added to the database.
-
-<table>
-	<tr>
-		<td>meta_data</td>
-		<td>(id integer,key integer,value varchar);</td>
-	</tr>
-	<tr>
-		<td>tagged_images</td>
-		<td>(imgid integer, tagid integer, primary key(imgid, tagid));</td>
-	</tr>
-	<tr>
-		<td>tags</td>
-		<td>(id integer primary key, name varchar, icon blob, description varchar, flags integer);</td>
-	</tr>
-	<tr>
-		<td>history</td>
-		<td>(imgid integer, num integer, module integer, operation varchar(256), op_params blob, enabled integer,blendop_params blob, blendop_version integer);</td>
-	</tr>
-	<tr>
-		<td>images</td>
-		<td>(id integer primary key, film_id integer, width int, height int, filename varchar, 
-		maker varchar, model varchar, lens varchar, exposure real, aperture real, iso real, 
-		focal_length real, focus_distance real, datetime_taken char(20), flags integer, 
-		output_width integer, output_height integer, crop real, raw_parameters integer, 
-		raw_denoise_threshold real, raw_auto_bright_threshold real, raw_black real, raw_maximum real, 
-		caption varchar, description varchar, license varchar, sha1sum char(40), orientation integer, 
-		group_id integer, histogram blob, lightmap blob, longitude double, latitude double, 
-		color_matrix blob);</td>
-	<tr>
-		<td>film_rolls</td>
-		<td>(id integer primary key, datetime_accessed char(20), folder varchar(1024));</td>
-	</tr>
-</table>  
 
